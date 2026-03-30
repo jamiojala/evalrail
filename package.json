@@ -1,6 +1,6 @@
 {
   "name": "@jamiojala/evalrail",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first prompt testing and evaluation framework for TypeScript teams.",
   "license": "MIT",
   "author": "Jami Ojala",
