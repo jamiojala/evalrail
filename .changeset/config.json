@@ -1,6 +1,11 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": false,
+  "changelog": [
+    "@changesets/cli/changelog",
+    {
+      "repo": "jamiojala/evalrail"
+    }
+  ],
   "commit": false,
   "fixed": [],
   "linked": [],
