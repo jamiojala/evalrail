@@ -5,3 +5,6 @@ coverage
 .DS_Store
 .evalrail
 *.log
+.env
+.env.local
+.env.*.local

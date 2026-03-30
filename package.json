@@ -45,18 +45,21 @@
     "version-packages": "changeset version",
     "release": "changeset publish",
     "example:basic": "tsx examples/basic.ts",
-    "example:compare": "tsx examples/provider-compare.ts"
+    "example:compare": "tsx examples/provider-compare.ts",
+    "example:openai": "tsx examples/openai.ts"
   },
   "keywords": [
     "prompt-testing",
     "evaluation",
     "llm",
     "regression-testing",
-    "typescript"
+    "typescript",
+    "openai-compatible"
   ],
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
     "@types/node": "^24.6.1",
+    "dotenv": "^17.2.3",
     "tsup": "^8.5.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

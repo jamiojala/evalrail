@@ -60,6 +60,15 @@ export const provider: PromptProvider = {
 };
 ```
 
+If you want a fast real-provider setup after clone, use the built-in OpenAI-compatible adapter:
+
+```bash
+cp .env.example .env.local
+pnpm example:openai
+```
+
+See `docs/provider-adapters.md` for details.
+
 ## 4. Run Suite
 
 ```ts

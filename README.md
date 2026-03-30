@@ -32,6 +32,19 @@ This repository is intentionally safe for open source collaboration:
 - Examples and tests use local/mock providers only.
 - Real provider integrations belong in each team's private runtime code or environment configuration.
 
+## Real Provider Quickstart (After Clone)
+
+You can still run against a real provider quickly without committing secrets.
+
+```bash
+cp .env.example .env.local
+# edit .env.local with your OPENAI_API_KEY
+pnpm install
+pnpm example:openai
+```
+
+This uses `createOpenAICompatibleProvider(...)` and reads values from `.env.local`.
+
 ## Install
 
 ```bash
@@ -166,6 +179,7 @@ describe("prompt guardrails", () => {
 - [`docs/getting-started.md`](docs/getting-started.md)
 - [`docs/fixtures-and-regression.md`](docs/fixtures-and-regression.md)
 - [`docs/provider-comparison.md`](docs/provider-comparison.md)
+- [`docs/provider-adapters.md`](docs/provider-adapters.md)
 
 ## Scripts
 
@@ -175,6 +189,7 @@ pnpm typecheck
 pnpm build
 pnpm example:basic
 pnpm example:compare
+pnpm example:openai
 ```
 
 ## Contributing

@@ -29,6 +29,8 @@ export {
   defaultRegressionComparator
 } from "./regression";
 
+export { createOpenAICompatibleProvider } from "./providers/openai-compatible";
+
 export { renderPromptTemplate } from "./template";
 
 export type {
@@ -55,6 +57,8 @@ export type {
   RunEvalSuiteOptions,
   TokenUsage
 } from "./types";
+
+export type { OpenAICompatibleProviderOptions } from "./providers/openai-compatible";
 
 export type {
   ProviderComparisonResult,
