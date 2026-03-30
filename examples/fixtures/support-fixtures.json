@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "id": "refund-request",
+      "prompt": "You are a support agent. Draft a response for this issue: {{issue}}",
+      "variables": {
+        "issue": "Customer requests a refund after a billing mistake"
+      },
+      "contains": ["refund", "billing"],
+      "notContains": ["guaranteed"],
+      "minLength": 60,
+      "referenceOutput": "We reviewed the billing mistake and approved a refund."
+    },
+    {
+      "id": "incident-update",
+      "prompt": "Write an incident status update for: {{incident}}",
+      "variables": {
+        "incident": "Elevated API latency in eu-west"
+      },
+      "contains": ["latency", "status"],
+      "minLength": 50,
+      "referenceOutput": "API latency incident status: mitigated and monitoring closely."
+    }
+  ]
+}
