@@ -196,6 +196,20 @@ pnpm example:openai
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+## Release Setup Notes
+
+If release PR creation fails with:
+
+`GitHub Actions is not permitted to create or approve pull requests`
+
+enable this repository setting:
+
+- `Settings` -> `Actions` -> `General` -> `Workflow permissions` ->
+  `Allow GitHub Actions to create and approve pull requests`
+
+If your org policy still blocks this, create a fine-grained PAT with repository
+write access and store it as `CHANGESETS_GITHUB_TOKEN` for the release workflow.
+
 ## License
 
 MIT

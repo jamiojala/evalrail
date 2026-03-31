@@ -36,5 +36,7 @@ jobs:
           version: pnpm version-packages
           publish: pnpm release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a PAT (CHANGESETS_GITHUB_TOKEN) when repository policy blocks
+          # GitHub Actions from creating pull requests with the default token.
+          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
