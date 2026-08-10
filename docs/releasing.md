@@ -13,7 +13,7 @@ corepack pnpm@10.34.5 package:check
 corepack pnpm@10.34.5 audit:ci
 ```
 
-The release workflow runs typecheck, tests, and build on Node.js 22, 24, and 26 in a read-only job. The write-enabled Changesets job cannot start until the complete matrix passes.
+The release workflow runs typecheck, tests, and build on Node.js 22, 24, and 26 in a read-only job. The write-enabled Changesets job cannot start until the complete matrix passes. A later `main` push with no Changeset becomes a verified no-op when the current npm version, provenance-bound tag, and final GitHub Release already agree; it does not attempt to republish an immutable version.
 
 `package:check` exercises the clean `prepack` lifecycle, creates a real tarball, enforces the shipped-file allowlist, installs that tarball into a clean temporary consumer, and verifies ESM import, CommonJS require, and TypeScript resolution. It removes its temporary files on exit.
 
@@ -44,7 +44,7 @@ npm view @jamiojala/evalrail version dist.integrity
 - Install the exact registry version in a new temporary consumer project.
 - Verify both ESM import and CommonJS require against the registry artifact.
 - Confirm the Git tag and GitHub release point to the published source commit.
-- Confirm npm exposes an SLSA provenance attestation for the exact version.
+- Verify the exact package's npm registry signature and provenance attestation. The automated gate checks the Sigstore signature, GitHub Actions certificate issuer and workflow identity, certificate-transparency and Rekor proofs, sha512 package subject, repository, workflow path, branch ref, and source commit before it creates or accepts the tag and final, non-draft, non-prerelease GitHub Release.
 - Confirm the README and this document still match the verified registry state.
 
 If any check fails, do not claim a registry release. Record the exact partial state and fix forward.

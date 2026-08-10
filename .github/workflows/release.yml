@@ -59,11 +59,11 @@ jobs:
   release-mode:
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
-      mode: ${{ steps.detect.outputs.mode }}
+      mode: ${{ steps.existing_state.outputs.mode || steps.detect.outputs.mode }}
 
     steps:
       - name: Checkout
@@ -71,15 +71,87 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Detect version or publish mode
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
+      - name: Detect changesets or registry state
         id: detect
         shell: bash
         run: |
           if find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit | grep -q .; then
             echo "mode=version" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=publish" >> "$GITHUB_OUTPUT"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          package_name="$(node -p "require('./package.json').name")"
+          expected_version="$(node -p "require('./package.json').version")"
+          actual_version="$(npm view "$package_name@$expected_version" version --json --registry=https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)"
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$expected_version" >> "$GITHUB_OUTPUT"
+
+          if [[ "$actual_version" != "$expected_version" ]]; then
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify existing npm provenance
+        id: existing_provenance
+        if: steps.detect.outputs.published == 'true'
+        uses: ./.github/actions/verify-npm-provenance
+        with:
+          package-name: ${{ steps.detect.outputs.package_name }}
+          package-version: ${{ steps.detect.outputs.package_version }}
+          repository-url: https://github.com/${{ github.repository }}
+          workflow-path: .github/workflows/release.yml
+          workflow-ref: refs/heads/main
+
+      - name: Reconcile existing release state
+        id: existing_state
+        if: steps.detect.outputs.published == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROVENANCE_COMMIT: ${{ steps.existing_provenance.outputs.commit }}
+          PACKAGE_VERSION: ${{ steps.detect.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          tag_name="v$PACKAGE_VERSION"
+          tag_type="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" --jq '.object.type' 2>/dev/null || true)"
+          tag_target="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" --jq '.object.sha' 2>/dev/null || true)"
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" 2>/dev/null || true)"
+
+          if [[ -z "$tag_target" || -z "$release_json" ]]; then
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          for _depth in {1..5}; do
+            if [[ "$tag_type" != "tag" ]]; then
+              break
+            fi
+            tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_target")"
+            tag_type="$(jq -er '.object.type' <<< "$tag_object")"
+            tag_target="$(jq -er '.object.sha' <<< "$tag_object")"
+          done
+
+          if [[ "$tag_type" != "commit" || "$tag_target" != "$PROVENANCE_COMMIT" ]]; then
+            echo "The release tag does not match the commit verified from npm provenance." >&2
+            exit 1
+          fi
+          if ! jq -e --arg tag "$tag_name" \
+            '.tag_name == $tag and .draft == false and .prerelease == false' \
+            <<< "$release_json" >/dev/null; then
+            echo "The existing GitHub Release is not a final release for the exact tag." >&2
+            exit 1
+          fi
+
+          echo "mode=noop" >> "$GITHUB_OUTPUT"
 
   version:
     needs:
@@ -182,22 +254,19 @@ jobs:
         shell: bash
         run: rm -f "$HOME/.npmrc" "$GITHUB_WORKSPACE/.npmrc"
 
-      - name: Reconcile registry, tag, and GitHub Release
-        if: always()
+      - name: Wait for exact npm package metadata
+        id: registry
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           package_name="$(node -p "require('./package.json').name")"
           expected_version="$(node -p "require('./package.json').version")"
-          tag_name="v$expected_version"
-          expected_subject="pkg:npm/${package_name/@/%40}@$expected_version"
 
           for attempt in {1..12}; do
-            actual_version="$(npm view "$package_name@$expected_version" version --json 2>/dev/null | tr -d '"' || true)"
-            integrity="$(npm view "$package_name@$expected_version" dist.integrity --json 2>/dev/null | tr -d '"' || true)"
-            attestation_url="$(npm view "$package_name@$expected_version" dist.attestations.url --json 2>/dev/null | tr -d '"' || true)"
-            if [[ "$actual_version" == "$expected_version" && "$integrity" == sha512-* && -n "$attestation_url" ]]; then
+            actual_version="$(npm view "$package_name@$expected_version" version --json --registry=https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)"
+            integrity="$(npm view "$package_name@$expected_version" dist.integrity --json --registry=https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)"
+            attestation_url="$(npm view "$package_name@$expected_version" dist.attestations.url --json --registry=https://registry.npmjs.org 2>/dev/null | tr -d '"' || true)"
+            if [[ "$actual_version" == "$expected_version" && "$integrity" == sha512-* && -n "$attestation_url" && "$attestation_url" != "null" ]]; then
               break
             fi
             if [[ "$attempt" == 12 ]]; then
@@ -207,29 +276,34 @@ jobs:
             sleep 5
           done
 
-          integrity_hex="$(node -e '
-            const value = process.argv[1];
-            process.stdout.write(Buffer.from(value.slice("sha512-".length), "base64").toString("hex"));
-          ' "$integrity")"
-          provenance_payload="$(curl -fsSL "$attestation_url" | jq -r '
-            .attestations[]
-            | select(.predicateType == "https://slsa.dev/provenance/v1")
-            | .bundle.dsseEnvelope.payload
-          ' | base64 --decode)"
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$expected_version" >> "$GITHUB_OUTPUT"
 
-          if ! jq -e \
-            --arg subject "$expected_subject" \
-            --arg digest "$integrity_hex" \
-            --arg repository "https://github.com/$GITHUB_REPOSITORY" \
-            --arg workflow ".github/workflows/release.yml" \
-            --arg commit "$GITHUB_SHA" \
-            '
-              any(.subject[]; .name == $subject and .digest.sha512 == $digest)
-              and .predicate.buildDefinition.externalParameters.workflow.repository == $repository
-              and .predicate.buildDefinition.externalParameters.workflow.path == $workflow
-              and any(.predicate.buildDefinition.resolvedDependencies[]; .digest.gitCommit == $commit)
-            ' <<< "$provenance_payload" >/dev/null; then
-            echo "npm provenance does not bind the exact artifact to this repository, workflow, and commit." >&2
+      - name: Verify npm registry signature and provenance
+        id: provenance
+        uses: ./.github/actions/verify-npm-provenance
+        with:
+          package-name: ${{ steps.registry.outputs.package_name }}
+          package-version: ${{ steps.registry.outputs.package_version }}
+          repository-url: https://github.com/${{ github.repository }}
+          workflow-path: .github/workflows/release.yml
+          workflow-ref: refs/heads/main
+
+      - name: Reconcile tag and final GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROVENANCE_COMMIT: ${{ steps.provenance.outputs.commit }}
+          PACKAGE_NAME: ${{ steps.registry.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.registry.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          package_name="$PACKAGE_NAME"
+          expected_version="$PACKAGE_VERSION"
+          tag_name="v$expected_version"
+
+          if [[ "$PROVENANCE_COMMIT" != "$GITHUB_SHA" ]]; then
+            echo "The npm provenance commit does not match this publishing run." >&2
             exit 1
           fi
 
@@ -240,11 +314,18 @@ jobs:
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag_name" -f sha="$GITHUB_SHA" >/dev/null
             tag_type="commit"
             tag_target="$GITHUB_SHA"
-          elif [[ "$tag_type" == "tag" ]]; then
-            tag_target="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_target" --jq '.object.sha')"
           fi
 
-          if [[ "$tag_target" != "$GITHUB_SHA" ]]; then
+          for _depth in {1..5}; do
+            if [[ "$tag_type" != "tag" ]]; then
+              break
+            fi
+            tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_target")"
+            tag_type="$(jq -er '.object.type' <<< "$tag_object")"
+            tag_target="$(jq -er '.object.sha' <<< "$tag_object")"
+          done
+
+          if [[ "$tag_type" != "commit" || "$tag_target" != "$PROVENANCE_COMMIT" ]]; then
             echo "The release tag does not point to the publishing commit." >&2
             exit 1
           fi
@@ -261,8 +342,10 @@ jobs:
             gh release create "$tag_name" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$tag_name" --notes "$release_notes"
           fi
 
-          release_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" --jq '.tag_name')"
-          if [[ "$release_tag" != "$tag_name" ]]; then
-            echo "GitHub Release reconciliation failed." >&2
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name")"
+          if ! jq -e --arg tag "$tag_name" \
+            '.tag_name == $tag and .draft == false and .prerelease == false' \
+            <<< "$release_json" >/dev/null; then
+            echo "GitHub Release reconciliation did not produce an exact final release." >&2
             exit 1
           fi
