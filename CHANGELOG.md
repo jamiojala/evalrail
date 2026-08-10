@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- 310cf1a: Prepare the package for its first npm release with verified runtime and type-resolution tarball smoke tests, hardened snapshot paths and provider errors, explicit provider rollout gates, token-budget assertions, current tooling, and truthful release documentation.
+
 ## 0.2.0 (source milestone, not published)
 
 Registry availability is independently verifiable with `npm view @jamiojala/evalrail version`. This entry and other versions explicitly labelled as source milestones were not registry releases.
