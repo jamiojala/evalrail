@@ -1,13 +1,13 @@
 # Provider Adapters
 
-EvalRail ships a built-in `createOpenAICompatibleProvider(...)` adapter so users can start with a real provider quickly.
+EvalRail ships a built-in `createOpenAICompatibleProvider(...)` adapter for OpenAI-compatible chat-completions endpoints. Other providers implement the small `PromptProvider` interface.
 
 ## Clone-and-Run Setup
 
 ```bash
 cp .env.example .env.local
 # fill OPENAI_API_KEY
-pnpm install
+corepack pnpm@10.34.5 install --frozen-lockfile
 pnpm example:openai
 ```
 
@@ -51,8 +51,12 @@ const run = await runEvalSuite({
 });
 ```
 
+When the endpoint returns `prompt_tokens`, `completion_tokens`, or `total_tokens`, the adapter maps them to EvalRail's `tokenUsage`. Run results and provider summaries preserve valid non-negative integer counts for fixture budgets and rollout gates. If a reported total is lower than valid input plus output counts, EvalRail uses the larger value to avoid approving an undercount. No currency cost is inferred.
+
 ## Security Notes
 
 - Never commit `.env.local`.
 - Commit only `.env.example` placeholders.
 - In CI, inject keys as encrypted secrets.
+- Treat prompts and provider responses according to the configured endpoint's data policy.
+- Prefer credential-free mock providers for untrusted pull-request workflows.
