@@ -56,8 +56,36 @@ jobs:
         if: matrix.node-version == 22
         run: pnpm audit:ci
 
-  release:
+  release-mode:
     needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.detect.outputs.mode }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Detect version or publish mode
+        id: detect
+        shell: bash
+        run: |
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit | grep -q .; then
+            echo "mode=version" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+          fi
+
+  version:
+    needs:
+      - verify
+      - release-mode
+    if: needs.release-mode.outputs.mode == 'version'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -82,11 +110,159 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create Release PR or Publish
+      - name: Create or update Release PR
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           github-token: ${{ secrets.CHANGESETS_GITHUB_TOKEN || github.token }}
           version: pnpm version-packages
-          publish: pnpm release
+
+  publish:
+    needs:
+      - verify
+      - release-mode
+    if: needs.release-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify npm publish identity
+        shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "${NPM_TOKEN:-}" ]]; then
+            echo "NPM_TOKEN is required for publish mode." >&2
+            exit 1
+          fi
+
+          npmrc="$RUNNER_TEMP/evalrail-npmrc"
+          trap 'rm -f "$npmrc"' EXIT
+          umask 077
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$npmrc"
+
+          publisher="$(NPM_CONFIG_USERCONFIG="$npmrc" npm whoami --registry=https://registry.npmjs.org)"
+          if [[ "$publisher" != "jamiojala" ]]; then
+            echo "The configured npm token does not belong to the expected publisher." >&2
+            exit 1
+          fi
+
+      - name: Publish package
+        continue-on-error: true
+        shell: bash
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          umask 077
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+          pnpm release
+
+      - name: Remove npm credentials
+        if: always()
+        shell: bash
+        run: rm -f "$HOME/.npmrc" "$GITHUB_WORKSPACE/.npmrc"
+
+      - name: Reconcile registry, tag, and GitHub Release
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          expected_version="$(node -p "require('./package.json').version")"
+          tag_name="v$expected_version"
+          expected_subject="pkg:npm/${package_name/@/%40}@$expected_version"
+
+          for attempt in {1..12}; do
+            actual_version="$(npm view "$package_name@$expected_version" version --json 2>/dev/null | tr -d '"' || true)"
+            integrity="$(npm view "$package_name@$expected_version" dist.integrity --json 2>/dev/null | tr -d '"' || true)"
+            attestation_url="$(npm view "$package_name@$expected_version" dist.attestations.url --json 2>/dev/null | tr -d '"' || true)"
+            if [[ "$actual_version" == "$expected_version" && "$integrity" == sha512-* && -n "$attestation_url" ]]; then
+              break
+            fi
+            if [[ "$attempt" == 12 ]]; then
+              echo "The exact package version, integrity, and attestation URL were not visible in npm." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+          integrity_hex="$(node -e '
+            const value = process.argv[1];
+            process.stdout.write(Buffer.from(value.slice("sha512-".length), "base64").toString("hex"));
+          ' "$integrity")"
+          provenance_payload="$(curl -fsSL "$attestation_url" | jq -r '
+            .attestations[]
+            | select(.predicateType == "https://slsa.dev/provenance/v1")
+            | .bundle.dsseEnvelope.payload
+          ' | base64 --decode)"
+
+          if ! jq -e \
+            --arg subject "$expected_subject" \
+            --arg digest "$integrity_hex" \
+            --arg repository "https://github.com/$GITHUB_REPOSITORY" \
+            --arg workflow ".github/workflows/release.yml" \
+            --arg commit "$GITHUB_SHA" \
+            '
+              any(.subject[]; .name == $subject and .digest.sha512 == $digest)
+              and .predicate.buildDefinition.externalParameters.workflow.repository == $repository
+              and .predicate.buildDefinition.externalParameters.workflow.path == $workflow
+              and any(.predicate.buildDefinition.resolvedDependencies[]; .digest.gitCommit == $commit)
+            ' <<< "$provenance_payload" >/dev/null; then
+            echo "npm provenance does not bind the exact artifact to this repository, workflow, and commit." >&2
+            exit 1
+          fi
+
+          tag_type="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" --jq '.object.type' 2>/dev/null || true)"
+          tag_target="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" --jq '.object.sha' 2>/dev/null || true)"
+
+          if [[ -z "$tag_target" ]]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag_name" -f sha="$GITHUB_SHA" >/dev/null
+            tag_type="commit"
+            tag_target="$GITHUB_SHA"
+          elif [[ "$tag_type" == "tag" ]]; then
+            tag_target="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_target" --jq '.object.sha')"
+          fi
+
+          if [[ "$tag_target" != "$GITHUB_SHA" ]]; then
+            echo "The release tag does not point to the publishing commit." >&2
+            exit 1
+          fi
+
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" >/dev/null 2>&1; then
+            release_notes="$(awk -v version="$expected_version" '
+              $0 == "## " version { capture = 1; next }
+              capture && /^## / { exit }
+              capture { print }
+            ' CHANGELOG.md)"
+            if [[ -z "${release_notes//[[:space:]]/}" ]]; then
+              release_notes="Release $expected_version of $package_name."
+            fi
+            gh release create "$tag_name" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$tag_name" --notes "$release_notes"
+          fi
+
+          release_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag_name" --jq '.tag_name')"
+          if [[ "$release_tag" != "$tag_name" ]]; then
+            echo "GitHub Release reconciliation failed." >&2
+            exit 1
+          fi

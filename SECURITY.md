@@ -2,7 +2,7 @@
 
 ## Supported Code
 
-EvalRail has not published an npm release yet. Security fixes currently target the latest code on `main`. This section will be updated when supported registry versions exist.
+Security fixes target the latest code on `main`. Registry consumers should verify the current published version with `npm view @jamiojala/evalrail version` and include the exact affected version in a report. No blanket support window is promised unless a release note states one.
 
 ## Reporting a Vulnerability
 
@@ -20,4 +20,4 @@ Treat the configured regression `storeDir` and its existing directory tree as tr
 
 ## Release Security Checks
 
-The first-release preflight includes the test suite, a real packed-artifact install, ESM/CommonJS/type-resolution checks, and an audit gate for moderate and higher severities. Snapshot path containment, sanitized-name collision handling, and upstream-error redaction and body cancellation have focused regression coverage.
+The release preflight includes the test suite, a real packed-artifact install, ESM/CommonJS/type-resolution checks, an npm publisher identity check, and an audit gate for moderate and higher severities. Snapshot path containment, sanitized-name collision handling, and upstream-error redaction and body cancellation have focused regression coverage.

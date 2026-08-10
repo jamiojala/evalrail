@@ -2,7 +2,7 @@
 
 This guide builds a local-first LLM evaluation workflow with typed fixtures, prompt regression snapshots, explicit token budgets, provider comparison, and a GitHub Actions gate.
 
-EvalRail has not been published to npm yet. The examples use the future package import to show the consuming-project API. Inside the EvalRail repository, use `../src` as shown in [`examples/vitest-prompt-regression.test.ts`](../examples/vitest-prompt-regression.test.ts).
+The examples use the package import expected in a consuming project. Verify the current registry version with `npm view @jamiojala/evalrail version`; inside the EvalRail repository, use `../src` as shown in [`examples/vitest-prompt-regression.test.ts`](../examples/vitest-prompt-regression.test.ts).
 
 ## What this workflow proves
 
