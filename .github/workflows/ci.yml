@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck and test
+      - name: Typecheck, test, and example smoke
         run: pnpm check
 
       - name: Build

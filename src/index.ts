@@ -1,6 +1,7 @@
 export {
   expectContains,
   expectMatches,
+  expectMaxTotalTokens,
   expectMinLength,
   expectNotContains,
   expectReferenceSimilarity,
@@ -13,13 +14,18 @@ export {
   writeFixtureFile
 } from "./fixtures";
 
-export { buildProviderComparison } from "./comparison";
+export {
+  buildProviderComparison,
+  evaluateProviderRollout
+} from "./comparison";
 
 export {
   hasFailures,
   assertRunPassed,
   formatRunSummary,
-  formatProviderComparison
+  formatProviderComparison,
+  formatProviderRollout,
+  assertRolloutPassed
 } from "./reporter";
 
 export { runEvalSuite } from "./runner";
@@ -44,6 +50,7 @@ export type {
   PromptProvider,
   PromptRequest,
   PromptResponse,
+  ProviderSummary,
   PromptValue,
   PromptVariables,
   RegressionComparator,
@@ -55,14 +62,20 @@ export type {
   RegressionSnapshot,
   RegressionStatus,
   RunEvalSuiteOptions,
-  TokenUsage
+  TokenUsage,
+  TokenUsageSummary
 } from "./types";
 
 export type { OpenAICompatibleProviderOptions } from "./providers/openai-compatible";
 
 export type {
   ProviderComparisonResult,
-  ProviderComparisonRow
+  ProviderComparisonRow,
+  ProviderRolloutCheck,
+  ProviderRolloutDecision,
+  ProviderRolloutMetric,
+  ProviderRolloutOptions,
+  ProviderRolloutThresholds
 } from "./comparison";
 
 export type {

@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import {
   expectContains,
   expectMatches,
+  expectMaxTotalTokens,
   expectMinLength,
   expectNotContains,
   expectReferenceSimilarity
@@ -18,6 +19,7 @@ export interface SerializedPromptFixture {
   notContains?: string[];
   matches?: string[];
   minLength?: number;
+  maxTotalTokens?: number;
   minReferenceSimilarity?: number;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -55,6 +57,9 @@ function compileFixture(source: SerializedPromptFixture): PromptFixture {
     ...(source.notContains ?? []).map((value) => expectNotContains(value)),
     ...(source.matches ?? []).map((value) => expectMatches(value)),
     ...(source.minLength ? [expectMinLength(source.minLength)] : []),
+    ...(source.maxTotalTokens !== undefined
+      ? [expectMaxTotalTokens(source.maxTotalTokens)]
+      : []),
     ...(source.minReferenceSimilarity
       ? [expectReferenceSimilarity(source.minReferenceSimilarity)]
       : [])

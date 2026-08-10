@@ -7,6 +7,7 @@ import type {
   PromptProvider,
   PromptRequest,
   PromptResponse,
+  ProviderSummary,
   RegressionMode,
   RegressionOutcome,
   RunEvalSuiteOptions
@@ -17,6 +18,7 @@ import {
   defaultRegressionComparator
 } from "./regression";
 import { renderPromptTemplate } from "./template";
+import { summarizeTokenUsage } from "./token-usage";
 import { mean, jaccardSimilarity } from "./utils";
 
 function getExpectationName(expectation: FixtureExpectation, index: number): string {
@@ -137,15 +139,7 @@ async function runRegression(
 function summarizeProviderResults(
   providerId: string,
   results: FixtureRunResult[]
-): {
-  providerId: string;
-  total: number;
-  passed: number;
-  failed: number;
-  passRate: number;
-  averageDurationMs: number;
-  averageReferenceSimilarity?: number;
-} {
+): ProviderSummary {
   const total = results.length;
   const passed = results.filter((result) => result.passed).length;
   const failed = total - passed;
@@ -153,26 +147,36 @@ function summarizeProviderResults(
   const referenceScores = results
     .map((result) => result.referenceSimilarity)
     .filter((value): value is number => typeof value === "number");
+  const providerDurations = results
+    .map((result) => result.providerDurationMs)
+    .filter((value): value is number => typeof value === "number");
+  const referenceSimilarityExpectedRuns = results.filter(
+    (result) => result.referenceSimilarityExpected
+  ).length;
 
-  const summary: {
-    providerId: string;
-    total: number;
-    passed: number;
-    failed: number;
-    passRate: number;
-    averageDurationMs: number;
-    averageReferenceSimilarity?: number;
-  } = {
+  const summary: ProviderSummary = {
     providerId,
     total,
     passed,
     failed,
     passRate: total === 0 ? 0 : passed / total,
-    averageDurationMs: mean(results.map((result) => result.durationMs))
+    averageDurationMs: mean(results.map((result) => result.durationMs)),
+    providerDurationRuns: providerDurations.length,
+    referenceSimilarityExpectedRuns,
+    referenceSimilarityRuns: referenceScores.length
   };
+
+  if (providerDurations.length > 0) {
+    summary.averageProviderDurationMs = mean(providerDurations);
+  }
 
   if (referenceScores.length > 0) {
     summary.averageReferenceSimilarity = mean(referenceScores);
+  }
+
+  const tokenUsage = summarizeTokenUsage(results);
+  if (tokenUsage !== undefined) {
+    summary.tokenUsage = tokenUsage;
   }
 
   return summary;
@@ -187,6 +191,18 @@ export async function runEvalSuite(
 
   if (options.providers.length === 0) {
     throw new Error("runEvalSuite requires at least one provider");
+  }
+
+  const providerIds = new Set<string>();
+  for (const provider of options.providers) {
+    if (!provider.id || provider.id.trim() === "") {
+      throw new Error("Provider id is required and cannot be empty");
+    }
+
+    if (providerIds.has(provider.id)) {
+      throw new Error(`Duplicate provider id: ${provider.id}`);
+    }
+    providerIds.add(provider.id);
   }
 
   defineFixtures(options.fixtures);
@@ -208,10 +224,14 @@ export async function runEvalSuite(
       const errors: string[] = [];
       let regressionOutcome: RegressionOutcome | undefined;
 
-      const start = Date.now();
+      const start = performance.now();
       const variables = fixture.variables ?? {};
       let renderedPrompt = "";
       let output = "";
+      let tokenUsage: PromptResponse["tokenUsage"];
+      let providerDurationMs: number | undefined;
+      const referenceOutput = fixture.referenceOutput;
+      const referenceSimilarityExpected = referenceOutput !== undefined;
 
       try {
         renderedPrompt = renderPromptTemplate(fixture.prompt, variables);
@@ -227,8 +247,15 @@ export async function runEvalSuite(
           request.metadata = fixture.metadata;
         }
 
-        const response = await provider.generate(request);
+        let response: PromptResponse;
+        const providerStartedAt = performance.now();
+        try {
+          response = await provider.generate(request);
+        } finally {
+          providerDurationMs = performance.now() - providerStartedAt;
+        }
         output = response.output;
+        tokenUsage = response.tokenUsage;
 
         const expectationOutcomes = await runExpectations(
           fixture,
@@ -258,9 +285,9 @@ export async function runEvalSuite(
           };
         }
 
-        const durationMs = Date.now() - start;
-        const referenceSimilarity = fixture.referenceOutput
-          ? jaccardSimilarity(output, fixture.referenceOutput)
+        const durationMs = performance.now() - start;
+        const referenceSimilarity = referenceOutput !== undefined
+          ? jaccardSimilarity(output, referenceOutput)
           : undefined;
 
         const passed =
@@ -277,8 +304,13 @@ export async function runEvalSuite(
           durationMs,
           passed,
           expectationOutcomes,
+          referenceSimilarityExpected,
           errors
         };
+
+        if (providerDurationMs !== undefined) {
+          result.providerDurationMs = providerDurationMs;
+        }
 
         if (regressionOutcome !== undefined) {
           result.regressionOutcome = regressionOutcome;
@@ -286,6 +318,10 @@ export async function runEvalSuite(
 
         if (referenceSimilarity !== undefined) {
           result.referenceSimilarity = referenceSimilarity;
+        }
+
+        if (tokenUsage !== undefined) {
+          result.tokenUsage = tokenUsage;
         }
 
         fixtureResults.push(result);
@@ -296,7 +332,7 @@ export async function runEvalSuite(
       } catch (error) {
         errors.push(error instanceof Error ? error.message : String(error));
 
-        const durationMs = Date.now() - start;
+        const durationMs = performance.now() - start;
         const result: FixtureRunResult = {
           suite: options.suite,
           fixtureId: fixture.id,
@@ -306,11 +342,20 @@ export async function runEvalSuite(
           durationMs,
           passed: false,
           expectationOutcomes: [],
+          referenceSimilarityExpected,
           errors
         };
 
+        if (providerDurationMs !== undefined) {
+          result.providerDurationMs = providerDurationMs;
+        }
+
         if (regressionOutcome !== undefined) {
           result.regressionOutcome = regressionOutcome;
+        }
+
+        if (tokenUsage !== undefined) {
+          result.tokenUsage = tokenUsage;
         }
 
         fixtureResults.push(result);

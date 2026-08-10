@@ -169,28 +169,74 @@ try {
     `import * as evalrail from ${JSON.stringify(packageJson.name)};\n` +
       `if (typeof evalrail.runEvalSuite !== "function") {\n` +
       `  throw new Error("ESM export runEvalSuite is unavailable");\n` +
-      `}\n`
+      `}\n` +
+      `if (typeof evalrail.evaluateProviderRollout !== "function") {\n` +
+      `  throw new Error("ESM export evaluateProviderRollout is unavailable");\n` +
+      `}\n` +
+      `const summary = { providerId: "baseline", total: 1, passed: 1, failed: 0, passRate: 1, averageDurationMs: 1, providerDurationRuns: 1, averageProviderDurationMs: 1, referenceSimilarityExpectedRuns: 0, referenceSimilarityRuns: 0 };\n` +
+      `const candidate = { ...summary, providerId: "candidate" };\n` +
+      `const decision = evalrail.evaluateProviderRollout({ suite: "smoke", startedAt: "", completedAt: "", fixtureResults: [], providerSummaries: [summary, candidate], totals: { total: 2, passed: 2, failed: 0 } }, { baselineProviderId: "baseline", candidateProviderId: "candidate", thresholds: { maxPassRateDrop: 0 } });\n` +
+      `evalrail.expectMaxTotalTokens(10);\n` +
+      `if (!evalrail.formatProviderRollout(decision).includes("PASS")) throw new Error("ESM rollout report failed");\n` +
+      `evalrail.assertRolloutPassed(decision);\n`
   );
   writeFileSync(
     join(consumerDirectory, "cjs-smoke.cjs"),
     `const evalrail = require(${JSON.stringify(packageJson.name)});\n` +
       `if (typeof evalrail.runEvalSuite !== "function") {\n` +
       `  throw new Error("CommonJS export runEvalSuite is unavailable");\n` +
-      `}\n`
+      `}\n` +
+      `if (typeof evalrail.evaluateProviderRollout !== "function") {\n` +
+      `  throw new Error("CommonJS export evaluateProviderRollout is unavailable");\n` +
+      `}\n` +
+      `const summary = { providerId: "baseline", total: 1, passed: 1, failed: 0, passRate: 1, averageDurationMs: 1, providerDurationRuns: 1, averageProviderDurationMs: 1, referenceSimilarityExpectedRuns: 0, referenceSimilarityRuns: 0 };\n` +
+      `const candidate = { ...summary, providerId: "candidate" };\n` +
+      `const decision = evalrail.evaluateProviderRollout({ suite: "smoke", startedAt: "", completedAt: "", fixtureResults: [], providerSummaries: [summary, candidate], totals: { total: 2, passed: 2, failed: 0 } }, { baselineProviderId: "baseline", candidateProviderId: "candidate", thresholds: { maxPassRateDrop: 0 } });\n` +
+      `evalrail.expectMaxTotalTokens(10);\n` +
+      `if (!evalrail.formatProviderRollout(decision).includes("PASS")) throw new Error("CommonJS rollout report failed");\n` +
+      `evalrail.assertRolloutPassed(decision);\n`
   );
   writeFileSync(
     join(consumerDirectory, "types-smoke.mts"),
-    `import { runEvalSuite, type RunEvalSuiteOptions } from ${JSON.stringify(packageJson.name)};\n` +
+    `import { assertRolloutPassed, evaluateProviderRollout, expectMaxTotalTokens, formatProviderRollout, runEvalSuite, type ProviderRolloutDecision, type ProviderRolloutOptions, type ProviderRolloutThresholds, type RunEvalSuiteOptions } from ${JSON.stringify(packageJson.name)};\n` +
       `const runner: typeof runEvalSuite = runEvalSuite;\n` +
+      `const rolloutEvaluator: typeof evaluateProviderRollout = evaluateProviderRollout;\n` +
+      `const tokenGate: ReturnType<typeof expectMaxTotalTokens> = expectMaxTotalTokens(100);\n` +
+      `const rolloutReporter: typeof formatProviderRollout = formatProviderRollout;\n` +
+      `const rolloutAssertion: typeof assertRolloutPassed = assertRolloutPassed;\n` +
       `const options = {} as RunEvalSuiteOptions;\n` +
+      `const rolloutOptions = {} as ProviderRolloutOptions;\n` +
+      `const rolloutThresholds = {} as ProviderRolloutThresholds;\n` +
+      `const rolloutDecision = {} as ProviderRolloutDecision;\n` +
       `void runner;\n` +
-      `void options;\n`
+      `void rolloutEvaluator;\n` +
+      `void tokenGate;\n` +
+      `void rolloutReporter;\n` +
+      `void rolloutAssertion;\n` +
+      `void options;\n` +
+      `void rolloutOptions;\n` +
+      `void rolloutThresholds;\n` +
+      `void rolloutDecision;\n`
   );
   writeFileSync(
     join(consumerDirectory, "types-smoke.cts"),
     `import evalrail = require(${JSON.stringify(packageJson.name)});\n` +
       `const runner: typeof evalrail.runEvalSuite = evalrail.runEvalSuite;\n` +
-      `void runner;\n`
+      `const rolloutEvaluator: typeof evalrail.evaluateProviderRollout = evalrail.evaluateProviderRollout;\n` +
+      `const tokenGate: ReturnType<typeof evalrail.expectMaxTotalTokens> = evalrail.expectMaxTotalTokens(100);\n` +
+      `const rolloutReporter: typeof evalrail.formatProviderRollout = evalrail.formatProviderRollout;\n` +
+      `const rolloutAssertion: typeof evalrail.assertRolloutPassed = evalrail.assertRolloutPassed;\n` +
+      `const rolloutOptions = {} as evalrail.ProviderRolloutOptions;\n` +
+      `const rolloutThresholds = {} as evalrail.ProviderRolloutThresholds;\n` +
+      `const rolloutDecision = {} as evalrail.ProviderRolloutDecision;\n` +
+      `void runner;\n` +
+      `void rolloutEvaluator;\n` +
+      `void tokenGate;\n` +
+      `void rolloutReporter;\n` +
+      `void rolloutAssertion;\n` +
+      `void rolloutOptions;\n` +
+      `void rolloutThresholds;\n` +
+      `void rolloutDecision;\n`
   );
   writeFileSync(
     join(consumerDirectory, "tsconfig.json"),

@@ -31,6 +31,13 @@ export interface TokenUsage {
   totalTokens?: number;
 }
 
+export interface TokenUsageSummary extends TokenUsage {
+  measuredRuns: number;
+  inputTokenRuns: number;
+  outputTokenRuns: number;
+  totalTokenRuns: number;
+}
+
 export interface PromptResponse {
   output: string;
   metadata?: Record<string, unknown>;
@@ -115,10 +122,13 @@ export interface FixtureRunResult {
   renderedPrompt: string;
   output: string;
   durationMs: number;
+  providerDurationMs?: number;
   passed: boolean;
   expectationOutcomes: ExpectationOutcome[];
   regressionOutcome?: RegressionOutcome;
+  referenceSimilarityExpected: boolean;
   referenceSimilarity?: number;
+  tokenUsage?: TokenUsage;
   errors: string[];
 }
 
@@ -129,7 +139,12 @@ export interface ProviderSummary {
   failed: number;
   passRate: number;
   averageDurationMs: number;
+  providerDurationRuns: number;
+  averageProviderDurationMs?: number;
+  referenceSimilarityExpectedRuns: number;
+  referenceSimilarityRuns: number;
   averageReferenceSimilarity?: number;
+  tokenUsage?: TokenUsageSummary;
 }
 
 export interface EvalTotals {

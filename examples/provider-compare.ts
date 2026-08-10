@@ -1,6 +1,9 @@
 import {
   buildProviderComparison,
+  assertRolloutPassed,
+  evaluateProviderRollout,
   formatProviderComparison,
+  formatProviderRollout,
   runEvalSuite,
   expectContains,
   type PromptFixture,
@@ -27,12 +30,14 @@ const conciseProvider: PromptProvider = {
   async generate(request) {
     if (request.fixtureId === "status-note") {
       return {
-        output: "The migration is stable and we observed no customer impact."
+        output: "The migration is stable and we observed no customer impact.",
+        tokenUsage: { inputTokens: 18, outputTokens: 12, totalTokens: 30 }
       };
     }
 
     return {
-      output: "Mitigation was rolled out and error rates returned to baseline."
+      output: "Mitigation was rolled out and error rates returned to baseline.",
+      tokenUsage: { inputTokens: 16, outputTokens: 11, totalTokens: 27 }
     };
   }
 };
@@ -42,12 +47,14 @@ const noisyProvider: PromptProvider = {
   async generate(request) {
     if (request.fixtureId === "status-note") {
       return {
-        output: "Everything is probably okay, still checking."
+        output: "Everything is probably okay, still checking.",
+        tokenUsage: { inputTokens: 20, outputTokens: 18, totalTokens: 38 }
       };
     }
 
     return {
-      output: "We did something but no details."
+      output: "We did something but no details.",
+      tokenUsage: { inputTokens: 18, outputTokens: 16, totalTokens: 34 }
     };
   }
 };
@@ -61,3 +68,16 @@ const run = await runEvalSuite({
 const comparison = buildProviderComparison(run);
 
 console.log(formatProviderComparison(comparison));
+
+const rollout = evaluateProviderRollout(run, {
+  baselineProviderId: "noisy",
+  candidateProviderId: "concise",
+  thresholds: {
+    maxPassRateDrop: 0,
+    minReferenceSimilarityDelta: -0.05,
+    maxTotalTokensMultiplier: 1.25
+  }
+});
+
+console.log(formatProviderRollout(rollout));
+assertRolloutPassed(rollout);

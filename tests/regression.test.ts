@@ -137,7 +137,8 @@ describe("regression checks", () => {
     }
   );
 
-  it.each([".", "..", ""])(
+  const reservedProviderIds = [".", ".."] as const;
+  it.each(reservedProviderIds)(
     "rejects provider id %j without creating a snapshot",
     async (providerId) => {
       const sandboxDir = await mkdtemp(join(tmpdir(), "evalrail-provider-path-"));

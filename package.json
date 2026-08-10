@@ -1,7 +1,7 @@
 {
   "name": "@jamiojala/evalrail",
   "version": "0.2.0",
-  "description": "Local-first prompt testing and evaluation framework for TypeScript teams.",
+  "description": "Local-first TypeScript library for LLM prompt evaluation, regression testing, provider rollout gates, and CI.",
   "license": "MIT",
   "author": "Jami Ojala",
   "homepage": "https://github.com/jamiojala/evalrail#readme",
@@ -38,7 +38,7 @@
   "scripts": {
     "audit:ci": "pnpm audit --audit-level moderate",
     "build": "tsup",
-    "check": "pnpm typecheck && pnpm test",
+    "check": "pnpm typecheck && pnpm test && pnpm example:compare",
     "package:check": "node scripts/package-check.mjs",
     "prepack": "pnpm build",
     "prepublishOnly": "pnpm check && pnpm audit:ci && pnpm package:check",
@@ -50,15 +50,25 @@
     "release": "changeset publish",
     "example:basic": "tsx examples/basic.ts",
     "example:compare": "tsx examples/provider-compare.ts",
+    "example:vitest": "vitest run examples/vitest-prompt-regression.test.ts",
     "example:openai": "tsx examples/openai.ts"
   },
   "keywords": [
-    "prompt-testing",
-    "evaluation",
     "llm",
+    "llm-evaluation",
+    "llm-testing",
+    "prompt-testing",
+    "prompt-evaluation",
+    "prompt-regression-testing",
     "regression-testing",
+    "snapshot-testing",
     "typescript",
-    "openai-compatible"
+    "vitest",
+    "ci",
+    "openai-compatible",
+    "provider-comparison",
+    "model-rollout",
+    "local-first"
   ],
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
