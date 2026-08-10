@@ -125,7 +125,7 @@ export function createOpenAICompatibleProvider(
   const fetcher = options.fetchImpl ?? globalThis.fetch;
 
   if (!fetcher) {
-    throw new Error("No fetch implementation found. Use Node.js 18+ or pass options.fetchImpl.");
+    throw new Error("No fetch implementation found. Use Node.js 22+ or pass options.fetchImpl.");
   }
 
   const baseUrl = ensureNoTrailingSlash(
@@ -166,9 +166,16 @@ export function createOpenAICompatibleProvider(
       });
 
       if (!response.ok) {
-        const body = await response.text();
+        const upstreamStatus = [response.status, response.statusText]
+          .filter((part) => part !== "")
+          .join(" ");
+        try {
+          await response.body?.cancel();
+        } catch {
+          // Preserve the upstream status error even if a custom body cannot be cancelled.
+        }
         throw new Error(
-          `OpenAI-compatible request failed (${response.status} ${response.statusText}): ${body}`
+          `OpenAI-compatible request failed (${upstreamStatus})`
         );
       }
 
