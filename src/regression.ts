@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import type {
   RegressionComparator,
@@ -24,16 +24,55 @@ export interface FileRegressionStoreOptions {
   storeDir: string;
 }
 
+function sanitizeRegressionSegment(value: string, label: string): string {
+  const sanitized = sanitizeFileSegment(value);
+
+  if (sanitized === "" || sanitized === "." || sanitized === "..") {
+    throw new Error(
+      `Invalid regression ${label}: value must resolve to a non-empty file segment other than "." or ".."`
+    );
+  }
+
+  return sanitized;
+}
+
 export class FileRegressionStore {
   private readonly cache = new Map<string, SnapshotDocument>();
   private readonly dirtyProviderIds = new Set<string>();
+  private readonly pathOwners = new Map<string, string>();
 
   constructor(private readonly options: FileRegressionStoreOptions) {}
 
   private buildPath(providerId: string): string {
-    const safeSuite = sanitizeFileSegment(this.options.suite);
-    const safeProvider = sanitizeFileSegment(providerId);
-    return join(this.options.storeDir, safeSuite, `${safeProvider}.snapshots.json`);
+    const safeSuite = sanitizeRegressionSegment(this.options.suite, "suite");
+    const safeProvider = sanitizeRegressionSegment(providerId, "provider id");
+    const storeRoot = resolve(this.options.storeDir);
+    const filePath = resolve(
+      storeRoot,
+      safeSuite,
+      `${safeProvider}.snapshots.json`
+    );
+    const pathFromStoreRoot = relative(storeRoot, filePath);
+
+    if (
+      pathFromStoreRoot === "" ||
+      pathFromStoreRoot === ".." ||
+      pathFromStoreRoot.startsWith(`..${sep}`) ||
+      isAbsolute(pathFromStoreRoot)
+    ) {
+      throw new Error("Regression snapshot path escapes the configured storeDir");
+    }
+
+    const portablePathKey = filePath.toLowerCase();
+    const existingOwner = this.pathOwners.get(portablePathKey);
+    if (existingOwner !== undefined && existingOwner !== providerId) {
+      throw new Error(
+        `Regression provider ids ${JSON.stringify(existingOwner)} and ${JSON.stringify(providerId)} resolve to the same portable snapshot path`
+      );
+    }
+    this.pathOwners.set(portablePathKey, providerId);
+
+    return filePath;
   }
 
   private async load(providerId: string): Promise<SnapshotDocument> {
@@ -48,6 +87,16 @@ export class FileRegressionStore {
     try {
       const raw = await readFile(filePath, "utf8");
       const parsed = JSON.parse(raw) as SnapshotDocument;
+
+      if (
+        parsed.suite !== this.options.suite ||
+        parsed.providerId !== providerId
+      ) {
+        throw new Error(
+          "Regression snapshot identity does not match the requested suite and provider"
+        );
+      }
+
       this.cache.set(providerId, parsed);
       return parsed;
     } catch (error) {

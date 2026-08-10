@@ -1,4 +1,5 @@
 import type { AssertionContext, FixtureExpectation } from "./types";
+import { resolveTotalTokens } from "./token-usage";
 import { jaccardSimilarity } from "./utils";
 
 function withDescription(
@@ -80,6 +81,36 @@ export function expectMinLength(minLength: number): FixtureExpectation {
       }
     },
     `minLength(${minLength})`
+  );
+}
+
+export function expectMaxTotalTokens(maxTotalTokens: number): FixtureExpectation {
+  if (
+    !Number.isSafeInteger(maxTotalTokens) ||
+    maxTotalTokens < 0
+  ) {
+    throw new Error("maxTotalTokens must be a non-negative safe integer");
+  }
+
+  return withDescription(
+    (context: AssertionContext) => {
+      const totalTokens = context.response.tokenUsage
+        ? resolveTotalTokens(context.response.tokenUsage)
+        : undefined;
+
+      if (totalTokens === undefined) {
+        throw new Error(
+          `Token usage is unavailable for fixture "${context.fixture.id}"`
+        );
+      }
+
+      if (totalTokens > maxTotalTokens) {
+        throw new Error(
+          `Expected total tokens <= ${maxTotalTokens}, received ${totalTokens}`
+        );
+      }
+    },
+    `maxTotalTokens(<=${maxTotalTokens})`
   );
 }
 

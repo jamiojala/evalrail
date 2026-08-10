@@ -1,8 +1,19 @@
-# Getting Started
+# Getting Started with EvalRail
 
-EvalRail is designed for local development loops first, then CI.
+EvalRail is designed for local TypeScript development loops first, then repeatable LLM evaluation in CI.
 
-## 1. Install
+## 1. Use the current source
+
+EvalRail has not been published to npm yet. Until `npm view @jamiojala/evalrail version` returns a verified release, clone the public repository and run the source checks:
+
+```bash
+git clone https://github.com/jamiojala/evalrail.git
+cd evalrail
+corepack pnpm@10.34.5 install --frozen-lockfile
+corepack pnpm@10.34.5 check
+```
+
+After the first verified registry release, the package installation will be:
 
 ```bash
 pnpm add -D @jamiojala/evalrail vitest
@@ -111,3 +122,24 @@ describe("prompt suite", () => {
   });
 });
 ```
+
+## 6. Add resource gates when usage is reported
+
+The OpenAI-compatible adapter maps response usage into EvalRail's token metrics. Custom providers can return the same `tokenUsage` shape.
+
+```ts
+import { expectMaxTotalTokens } from "@jamiojala/evalrail";
+
+const fixtures = [
+  {
+    id: "concise-release-note",
+    prompt: "Summarize release {{version}} in one sentence",
+    variables: { version: "2.0.0" },
+    expectations: [expectMaxTotalTokens(120)]
+  }
+];
+```
+
+The expectation fails when total-token usage is missing or exceeds the limit. EvalRail can derive total tokens from reported input and output counts, but it does not guess missing metrics.
+
+For provider migration gates and a complete GitHub Actions example, continue with [`testing-llm-prompts-in-typescript.md`](testing-llm-prompts-in-typescript.md).

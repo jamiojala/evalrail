@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { join } from "node:path";
 
 import {
@@ -9,15 +8,18 @@ import {
   runEvalSuite,
   type OpenAICompatibleProviderOptions
 } from "../src";
+import { loadExampleEnvironment } from "./load-environment";
 
-const fixtureFile = join(process.cwd(), "examples", "fixtures", "support-fixtures.json");
-const fixtures = await loadFixturesFromFile(fixtureFile);
+loadExampleEnvironment();
 
 if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.trim() === "") {
   throw new Error(
     "Missing OPENAI_API_KEY. Copy .env.example to .env.local and set OPENAI_API_KEY before running pnpm example:openai."
   );
 }
+
+const fixtureFile = join(process.cwd(), "examples", "fixtures", "support-fixtures.json");
+const fixtures = await loadFixturesFromFile(fixtureFile);
 
 const providerOptions: OpenAICompatibleProviderOptions = {
   id: process.env.EVALRAIL_PROVIDER_ID ?? "openai",

@@ -1,7 +1,7 @@
 {
   "name": "@jamiojala/evalrail",
   "version": "0.2.0",
-  "description": "Local-first prompt testing and evaluation framework for TypeScript teams.",
+  "description": "Local-first TypeScript library for LLM prompt evaluation, regression testing, provider rollout gates, and CI.",
   "license": "MIT",
   "author": "Jami Ojala",
   "homepage": "https://github.com/jamiojala/evalrail#readme",
@@ -13,7 +13,7 @@
     "url": "https://github.com/jamiojala/evalrail/issues"
   },
   "type": "module",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.34.5",
   "files": [
     "dist",
     "README.md",
@@ -30,14 +30,18 @@
     }
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "audit:ci": "pnpm audit --audit-level moderate",
     "build": "tsup",
-    "check": "pnpm typecheck && pnpm test",
+    "check": "pnpm typecheck && pnpm test && pnpm example:compare",
+    "package:check": "node scripts/package-check.mjs",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm check && pnpm audit:ci && pnpm package:check",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -46,23 +50,42 @@
     "release": "changeset publish",
     "example:basic": "tsx examples/basic.ts",
     "example:compare": "tsx examples/provider-compare.ts",
+    "example:vitest": "vitest run examples/vitest-prompt-regression.test.ts",
     "example:openai": "tsx examples/openai.ts"
   },
   "keywords": [
-    "prompt-testing",
-    "evaluation",
     "llm",
+    "llm-evaluation",
+    "llm-testing",
+    "prompt-testing",
+    "prompt-evaluation",
+    "prompt-regression-testing",
     "regression-testing",
+    "snapshot-testing",
     "typescript",
-    "openai-compatible"
+    "vitest",
+    "ci",
+    "openai-compatible",
+    "provider-comparison",
+    "model-rollout",
+    "local-first"
   ],
   "devDependencies": {
-    "@changesets/cli": "^2.30.0",
-    "@types/node": "^25.5.0",
-    "dotenv": "^17.3.1",
+    "@changesets/cli": "^2.31.1",
+    "@types/node": "^22.20.1",
+    "dotenv": "^17.4.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml@3.14.2": "3.15.1",
+      "js-yaml@4.1.1": "4.3.1",
+      "nanoid@3.3.11": "3.3.18",
+      "postcss@8.5.8": "8.5.26",
+      "vite@7.3.1": "7.3.6"
+    }
   }
 }

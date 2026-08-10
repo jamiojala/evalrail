@@ -71,19 +71,37 @@ describe("createOpenAICompatibleProvider", () => {
   });
 
   it("throws useful error on non-2xx upstream response", async () => {
+    const sensitiveUpstreamText = "secret-upstream-diagnostic-9b7d";
+    let bodyCancelled = false;
+    const upstreamResponse = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(sensitiveUpstreamText));
+        },
+        cancel() {
+          bodyCancelled = true;
+        }
+      }),
+      {
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { "content-type": "application/json" }
+      }
+    );
     const provider = createOpenAICompatibleProvider({
       model: "gpt-test",
       apiKey: "test-key",
-      fetchImpl: async () =>
-        new Response(JSON.stringify({ error: { message: "Rate limited" } }), {
-          status: 429,
-          statusText: "Too Many Requests",
-          headers: { "content-type": "application/json" }
-        })
+      fetchImpl: async () => upstreamResponse
     });
 
-    await expect(provider.generate(request)).rejects.toThrowError(
-      /OpenAI-compatible request failed \(429 Too Many Requests\)/
+    const error = await provider.generate(request).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain(
+      "OpenAI-compatible request failed (429 Too Many Requests)"
     );
+    expect((error as Error).message).not.toContain(sensitiveUpstreamText);
+    expect(bodyCancelled).toBe(true);
+    expect(upstreamResponse.bodyUsed).toBe(true);
   });
 });

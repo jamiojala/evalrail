@@ -22,18 +22,25 @@ describe("fixture files", () => {
         prompt: "Answer the question: {{question}}",
         variables: { question: "What is EvalRail?" },
         contains: ["EvalRail"],
-        minLength: 10
+        minLength: 10,
+        maxTotalTokens: 20
       }
     ]);
 
     const fixtures = await loadFixturesFromFile(fixturePath);
 
     expect(fixtures).toHaveLength(1);
-    expect(fixtures[0]?.expectations).toHaveLength(2);
+    expect(fixtures[0]?.expectations).toHaveLength(3);
 
-    const provider = createProvider("mock", () =>
-      "EvalRail is a local-first prompt testing framework."
-    );
+    const provider = {
+      id: "mock",
+      async generate() {
+        return {
+          output: "EvalRail is a local-first prompt testing framework.",
+          tokenUsage: { totalTokens: 12 }
+        };
+      }
+    };
 
     const run = await runEvalSuite({
       suite: "fixture-loader",

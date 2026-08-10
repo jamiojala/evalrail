@@ -18,6 +18,7 @@ JSON-only shortcuts (`loadFixturesFromFile` compiles these):
 - `notContains: string[]`
 - `matches: string[]` (regex source)
 - `minLength: number`
+- `maxTotalTokens: number` (fails closed when the provider reports no usable total)
 - `minReferenceSimilarity: number`
 
 ## Snapshot Location
@@ -78,3 +79,23 @@ const run = await runEvalSuite({
   }
 });
 ```
+
+## Token budgets alongside regression baselines
+
+Output drift and token growth are separate failure modes. A response can preserve the expected text while becoming materially larger. Add `maxTotalTokens` to a JSON fixture or `expectMaxTotalTokens(...)` to a TypeScript fixture when the provider reports usage.
+
+```json
+{
+  "fixtures": [
+    {
+      "id": "concise-support-answer",
+      "prompt": "Answer {{question}} in one sentence",
+      "variables": { "question": "How do I reset access?" },
+      "contains": ["reset"],
+      "maxTotalTokens": 120
+    }
+  ]
+}
+```
+
+EvalRail stores usage in the run result, not in regression snapshots. Counts must be non-negative safe integers. If a provider reports both components and a lower total, EvalRail uses the component sum so a budget cannot pass on an undercount. It does not estimate provider pricing or treat token count as a quality score.
