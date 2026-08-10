@@ -4,8 +4,8 @@ Thanks for contributing to EvalRail.
 
 ## Prerequisites
 
-- Node.js 18+
-- pnpm 10+
+- Node.js 22+
+- pnpm 10.34.5 through the repository `packageManager` declaration and Corepack
 
 ## Setup
 
@@ -20,6 +20,8 @@ pnpm test
 pnpm test:watch
 pnpm typecheck
 pnpm build
+pnpm package:check
+pnpm audit:ci
 ```
 
 ## Project Standards
@@ -37,7 +39,7 @@ pnpm build
 2. Add tests in `tests/`.
 3. Add/update docs under `docs/`.
 4. Add/update an example in `examples/` when useful.
-5. Run `pnpm check` before opening a PR.
+5. Run `pnpm check`, `pnpm build`, `pnpm package:check`, and `pnpm audit:ci` before opening a PR.
 
 ## Changesets
 
@@ -57,12 +59,10 @@ Select the package `@jamiojala/evalrail`, choose semantic version bump, and desc
 
 ## Release Flow
 
-- Changesets action opens/updates a version PR on `main`.
-- Merging that PR publishes to npm (when `NPM_TOKEN` is configured).
-- If PR creation is blocked by GitHub Actions policy, either:
-  1. Enable `Allow GitHub Actions to create and approve pull requests` in repository settings, or
-  2. Set a `CHANGESETS_GITHUB_TOKEN` secret (PAT with repository write access).
+- A source version or changelog entry does not prove an npm publication.
+- Changesets can open/update a version PR on `main` after the release preflight passes.
+- Publishing remains maintainer-only and requires the external GitHub/npm gates in [`docs/releasing.md`](docs/releasing.md).
 
 ## Code of Conduct
 
-Please be respectful, constructive, and collaborative.
+Participation is governed by [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).

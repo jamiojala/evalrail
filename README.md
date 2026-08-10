@@ -1,8 +1,20 @@
 # EvalRail
 
-`@jamiojala/evalrail` is a serious, local-first TypeScript framework for prompt testing and evaluation.
+`@jamiojala/evalrail` is a local-first TypeScript framework for prompt testing and evaluation.
 
-It is built for teams that ship: fixture-driven prompt tests, regression snapshots committed to your repo, and provider comparisons you can use during model rollouts.
+It is built for teams that ship: fixture-driven prompt tests, regression snapshots you can review and optionally commit in the consuming repo, and provider comparisons you can use during model rollouts.
+
+## Package Status
+
+EvalRail is public source, but `@jamiojala/evalrail` has not been published to npm yet. The repository is preparing its first registry release. Until an npm version is independently visible, use the source workflow below rather than the future registry install command.
+
+```bash
+git clone https://github.com/jamiojala/evalrail.git
+cd evalrail
+corepack pnpm@10.34.5 install --frozen-lockfile
+corepack pnpm@10.34.5 check
+corepack pnpm@10.34.5 package:check
+```
 
 ## Why EvalRail
 
@@ -29,8 +41,8 @@ Shipping prompts without tests creates the same risk as shipping code without te
 This repository is intentionally safe for open source collaboration:
 
 - No API keys, tokens, or provider credentials are stored in the repo.
-- Examples and tests use local/mock providers only.
-- Real provider integrations belong in each team's private runtime code or environment configuration.
+- Tests use local/mock providers and require no external credentials.
+- The real-provider example reads credentials from local environment configuration; it does not embed them in source.
 
 ## Real Provider Quickstart (After Clone)
 
@@ -45,7 +57,9 @@ pnpm example:openai
 
 This uses `createOpenAICompatibleProvider(...)` and reads values from `.env.local`.
 
-## Install
+## Registry Install (After First Publication)
+
+Once `npm view @jamiojala/evalrail version` returns a published version, install it with:
 
 ```bash
 pnpm add -D @jamiojala/evalrail vitest
@@ -187,6 +201,8 @@ describe("prompt guardrails", () => {
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm package:check
+pnpm audit:ci
 pnpm example:basic
 pnpm example:compare
 pnpm example:openai
@@ -196,19 +212,9 @@ pnpm example:openai
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-## Release Setup Notes
+## Releases
 
-If release PR creation fails with:
-
-`GitHub Actions is not permitted to create or approve pull requests`
-
-enable this repository setting:
-
-- `Settings` -> `Actions` -> `General` -> `Workflow permissions` ->
-  `Allow GitHub Actions to create and approve pull requests`
-
-If your org policy still blocks this, create a fine-grained PAT with repository
-write access and store it as `CHANGESETS_GITHUB_TOKEN` for the release workflow.
+No registry release is implied by a source version or changelog entry. Maintainer preflight and the remaining GitHub/npm gates are documented in [`docs/releasing.md`](docs/releasing.md).
 
 ## License
 
