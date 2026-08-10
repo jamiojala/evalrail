@@ -1,0 +1,87 @@
+name: Verify npm provenance
+description: Verify the exact npm artifact, registry signature, Sigstore identity, and SLSA provenance.
+
+inputs:
+  package-name:
+    description: Exact npm package name.
+    required: true
+  package-version:
+    description: Exact npm package version.
+    required: true
+  repository-url:
+    description: Expected GitHub repository URL.
+    required: true
+  workflow-path:
+    description: Expected publishing workflow path.
+    required: true
+  workflow-ref:
+    description: Expected publishing Git ref.
+    required: true
+
+outputs:
+  commit:
+    description: Git commit cryptographically bound to the npm artifact.
+    value: ${{ steps.verify.outputs.commit }}
+  integrity:
+    description: Registry sha512 integrity for the exact package version.
+    value: ${{ steps.verify.outputs.integrity }}
+
+runs:
+  using: composite
+  steps:
+    - name: Verify registry and provenance
+      id: verify
+      shell: bash
+      env:
+        PACKAGE_NAME: ${{ inputs.package-name }}
+        PACKAGE_VERSION: ${{ inputs.package-version }}
+        REPOSITORY_URL: ${{ inputs.repository-url }}
+        WORKFLOW_PATH: ${{ inputs.workflow-path }}
+        WORKFLOW_REF: ${{ inputs.workflow-ref }}
+      run: |
+        set -euo pipefail
+        package_spec="$PACKAGE_NAME@$PACKAGE_VERSION"
+        actual_version="$(npm view "$package_spec" version --json --registry=https://registry.npmjs.org | tr -d '"')"
+        integrity="$(npm view "$package_spec" dist.integrity --json --registry=https://registry.npmjs.org | tr -d '"')"
+        attestation_url="$(npm view "$package_spec" dist.attestations.url --json --registry=https://registry.npmjs.org | tr -d '"')"
+
+        if [[ "$actual_version" != "$PACKAGE_VERSION" || "$integrity" != sha512-* || -z "$attestation_url" || "$attestation_url" == "null" ]]; then
+          echo "The exact npm package, sha512 integrity, and attestation URL are required." >&2
+          exit 1
+        fi
+
+        audit_dir="$(mktemp -d "$RUNNER_TEMP/evalrail-signature-audit.XXXXXX")"
+        attestation_file="$RUNNER_TEMP/evalrail-attestations.json"
+        trap 'rm -rf "$audit_dir"; rm -f "$attestation_file"' EXIT
+        printf '{"name":"evalrail-signature-audit","private":true,"version":"0.0.0"}\n' > "$audit_dir/package.json"
+        (
+          cd "$audit_dir"
+          npm install --ignore-scripts --no-audit --no-fund --save-exact "$package_spec" --registry=https://registry.npmjs.org
+          npm audit signatures --registry=https://registry.npmjs.org
+        )
+
+        curl --fail --silent --show-error --location "$attestation_url" --output "$attestation_file"
+        sigstore_path="$(npm root -g)/npm/node_modules/sigstore"
+        if [[ ! -f "$sigstore_path/dist/index.js" ]]; then
+          echo "The npm CLI's bundled Sigstore verifier is unavailable." >&2
+          exit 1
+        fi
+
+        verification="$(
+          SIGSTORE_PATH="$sigstore_path" node "$GITHUB_WORKSPACE/scripts/verify-npm-provenance.mjs" \
+            "$attestation_file" \
+            "$PACKAGE_NAME" \
+            "$PACKAGE_VERSION" \
+            "$integrity" \
+            "$REPOSITORY_URL" \
+            "$WORKFLOW_PATH" \
+            "$WORKFLOW_REF"
+        )"
+        commit="$(jq -er '.commit' <<< "$verification")"
+        if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "Verified provenance did not return a Git commit." >&2
+          exit 1
+        fi
+
+        echo "commit=$commit" >> "$GITHUB_OUTPUT"
+        echo "integrity=$integrity" >> "$GITHUB_OUTPUT"
