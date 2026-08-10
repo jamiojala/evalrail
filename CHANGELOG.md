@@ -1,8 +1,8 @@
 # Changelog
 
-No EvalRail version has been published to npm at the time of this source revision. The entries below describe source milestones and Changesets-generated version history, not verified registry releases.
-
 ## 0.2.0 (source milestone, not published)
+
+Registry availability is independently verifiable with `npm view @jamiojala/evalrail version`. This entry and other versions explicitly labelled as source milestones were not registry releases.
 
 ### Minor Changes
 

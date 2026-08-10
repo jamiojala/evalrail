@@ -1,6 +1,6 @@
 # Releasing EvalRail
 
-EvalRail has not been published to npm yet. A source version, changelog entry, successful build, or merged version PR is not evidence of a registry release.
+A source version, changelog entry, successful build, or merged version PR is not evidence of a registry release. The npm registry, Git tag, and GitHub Release must agree before a version is called released.
 
 ## Automated Preflight
 
@@ -26,8 +26,8 @@ Before merging a release PR that can publish:
 1. Confirm the GitHub repository description and visibility match the library in `package.json`.
 2. Protect `main` and require the CI and CodeQL checks before merge.
 3. Enable GitHub private vulnerability reporting and Dependabot security updates.
-4. Confirm Actions is allowed to create pull requests, or configure a narrowly scoped `CHANGESETS_GITHUB_TOKEN` repository secret. The release action receives that token only in its write-enabled job.
-5. Configure a narrowly scoped npm access token with publish rights to `@jamiojala/evalrail` as the `NPM_TOKEN` repository secret. Do not put token values in source, issues, pull requests, or logs.
+4. Confirm Actions is allowed to create pull requests. The default `github.token` is preferred; configure a narrowly scoped `CHANGESETS_GITHUB_TOKEN` only if the default token cannot update the version PR.
+5. Configure a narrowly scoped npm access token with publish rights to `@jamiojala/evalrail` as the `NPM_TOKEN` secret in the protected `npm` environment. The workflow verifies that it resolves to the expected `jamiojala` identity before invoking Changesets. That identity check does not prove package write permission, token expiry, or 2FA-bypass policy; only the protected publish and reconciliation jobs close those gates. Do not put token values in source, issues, pull requests, or logs.
 6. Confirm the package name is still available and the intended version does not already exist.
 7. Review the generated version PR, changelog, packed manifest, dependency audit, and passing CI matrix.
 
@@ -44,6 +44,7 @@ npm view @jamiojala/evalrail version dist.integrity
 - Install the exact registry version in a new temporary consumer project.
 - Verify both ESM import and CommonJS require against the registry artifact.
 - Confirm the Git tag and GitHub release point to the published source commit.
-- Update the README package-status notice and this document from verified registry state.
+- Confirm npm exposes an SLSA provenance attestation for the exact version.
+- Confirm the README and this document still match the verified registry state.
 
-If any check fails, treat the repository as source-only and fix forward without claiming publication.
+If any check fails, do not claim a registry release. Record the exact partial state and fix forward.

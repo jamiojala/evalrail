@@ -6,9 +6,15 @@ Use it when a prompt, model, or provider change needs the same evidence you expe
 
 EvalRail is intentionally narrow. It is a library, not a hosted evaluation platform, dashboard, security scanner, or built-in LLM-as-judge system.
 
-## Package Status
+## Package Availability
 
-EvalRail is public source, but `@jamiojala/evalrail` has not been published to npm yet. The repository is preparing its first registry release. Until an npm version is independently visible, use the source workflow below rather than the future registry install command.
+The npm registry is the source of truth for published versions. Check the current version and artifact integrity before installing:
+
+```bash
+npm view @jamiojala/evalrail version dist.integrity
+```
+
+For development from the repository, use the source workflow:
 
 ```bash
 git clone https://github.com/jamiojala/evalrail.git
@@ -62,9 +68,9 @@ pnpm example:openai
 
 This uses `createOpenAICompatibleProvider(...)` and reads values from `.env.local`.
 
-## Registry Install (After First Publication)
+## Registry Install
 
-Once `npm view @jamiojala/evalrail version` returns a published version, install it with:
+When the registry check returns a version, install the package with:
 
 ```bash
 pnpm add -D @jamiojala/evalrail vitest

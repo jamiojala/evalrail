@@ -2,21 +2,27 @@
 
 EvalRail is designed for local TypeScript development loops first, then repeatable LLM evaluation in CI.
 
-## 1. Use the current source
+## 1. Choose a registry or source workflow
 
-EvalRail has not been published to npm yet. Until `npm view @jamiojala/evalrail version` returns a verified release, clone the public repository and run the source checks:
+The npm registry is the source of truth for published versions:
+
+```bash
+npm view @jamiojala/evalrail version dist.integrity
+```
+
+When that command returns a version, install it with:
+
+```bash
+pnpm add -D @jamiojala/evalrail vitest
+```
+
+For development from the repository, clone the public source and run its checks:
 
 ```bash
 git clone https://github.com/jamiojala/evalrail.git
 cd evalrail
 corepack pnpm@10.34.5 install --frozen-lockfile
 corepack pnpm@10.34.5 check
-```
-
-After the first verified registry release, the package installation will be:
-
-```bash
-pnpm add -D @jamiojala/evalrail vitest
 ```
 
 ## 2. Define Fixtures
